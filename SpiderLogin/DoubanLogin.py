@@ -1,69 +1,54 @@
-"""这是一个模拟登录豆瓣的程序"""
+"""模拟登录豆瓣"""
 import requests
 from lxml import etree
 
-loginurl = "https://www.douban.com/accounts/login"
-
-data = {
-        "redir":"https://www.douban.com",
-        "form_email":"******",                 #输入你的豆瓣帐号
-        "form_password":"******",              #输入你的豆瓣密码
-       }
 
 header = {
-                'User-Agent':'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.89 Safari/537.36',
-                'Accept-Encoding':'gzip, deflate, br',
-                'Accept':'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language':'zh-CN,zh;q=0.8,en-US;q=0.5,en;q=0.3',
-                'Host':'accounts.douban.com'
-         }                   #用firefoxhttp取得header和data，两个是登录请求的信息
+    'Host':'accounts.douban.com',
+    'User-Agent':'Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:49.0) Gecko/20100101 Firefox/49.0',
+    'Accept':'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language':'zh-CN,zh;q=0.8,en-US;q=0.5,en;q=0.3',
+    'Accept-Encoding':'gzip, deflate, br',
+    'Referer':'https://www.douban.com/accounts/login',
+    'Content-Type':'application/x-www-form-urlencoded',
+    'Content-Length':'126'
+}
 
+data= {
+    'redir':'https://www.douban.com',
+    'form_email':'',
+    'form_password':''
+}
+#data和header由谷歌浏览器获得
 
-#下载验证码
-def DownloadJpg():
-    page = requests.get(loginurl)
-    if "请输入上图中的单词" in page.text:
-        html = page.content
-        index = etree.HTML(html)
-        url = index.xpath(u'//img[@id="captcha_image"]')
-        Url = url[0].values()[1]
-        Id = index.xpath(u'//div[@class="captcha_block"]/input[@type="hidden"]')
-        id = Id[0].values()[2]
-        I = requests.get(Url,stream=True)
-        with open('验证码.jpg','wb') as f:                 #下载图片
-                for chunk in I.iter_content(chunk_size=1024):
-                    if chunk:
-                        f.write(chunk)
-        return id
-    return 0        #如果需要验证码就返回验证码id，不需要返回0
-
-
-#模拟登录
-def Login01(id):
-    s = requests.session()
-    if id != 0:             #需要验证码就添加验证码信息
-        captcha = input("请输入目录下的验证码(请等待10秒验证码图片下载):")
+#用户输入用户名和密码登录豆瓣
+def Login01(url,username,pwd):
+    data['form_email'] = username
+    data['form_password'] = pwd
+    s = requests.Session()
+    text = s.get(url).text
+    if '请输入上图中的单词' in text:     #如果有验证码
+        page = etree.HTML(text)
+        img = page.xpath('//img[@id="captcha_image"]/@src')     #取得验证码图片
+        id = page.xpath('//div[@class="captcha_block"]/input[@type="hidden"]/@value')   #取得登录必需的验证码值
+        pic = requests.get(img[0])
+        with open('豆瓣验证码','wb') as f:
+            for chunk in pic.iter_content(1024):
+                if chunk:
+                    f.write(chunk)
+        captcha = input('请输入验证码:')
         data['captcha-solution'] = captcha
-        data['captcha-id'] = id
-    l = s.post(loginurl, data = data, headers = header)
-    if '的帐号' in l.text:         #判断登录是否成功
-        print('登陆成功')
+        data['captcha-id'] = id[0]
+    p = s.post(url,headers=header,data=data)
+    if '的帐号' in p.text:
+        print('登录成功')
     else:
         print('登录失败')
 
 
-#用cookie模拟登录，待完善！！！
-def Login02(id):
-    req = requests.session()
-    cookie = {}
-    cookies = ''
-    for line in cookies.split(';'):
-        key,value = line.split('=',1)   #1代表只分一次，得到两个数据
-        cookie[key] = value
-    s = req.get(loginurl,cookies = cookie)
-    print(s.text)
+if __name__ == '__main__':
+    url = "https://www.douban.com/accounts/login"
+    username = input('请输入用户名:')
+    pwd = input('请输入密码:')
+    Login01(url,username,pwd)
 
-
-if __name__=='__main__':
-    id = DownloadJpg()
-    Login01(id)
